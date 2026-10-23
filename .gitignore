@@ -1,0 +1,30 @@
+# Authentication & Credentials (CRITICAL - NEVER COMMIT)
+storage_state.json
+chrome-profile/
+profile/
+*.log
+
+# Python virtual environment & cache
+.venv/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Generated outputs & downloads
+outputs/
+*.png
+*.jpg
+*.jpeg
+*.mp4
+*.webp
+
+# OS & IDE metadata
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
