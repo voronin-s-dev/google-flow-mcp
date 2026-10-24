@@ -3,10 +3,16 @@ import sys
 import io
 from pathlib import Path
 from mcp.server.mcpserver import MCPServer
-from engine import generate_flow_media, is_cdp_available, STORAGE_FILE
-
-# UTF-8 stdout для Windows консоли
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+from engine import (
+    generate_flow_media,
+    generate_frames_to_video,
+    extend_flow_video,
+    upscale_flow_image,
+    edit_flow_image,
+    finalize_asset,
+    is_cdp_available,
+    STORAGE_FILE
+)
 
 app = MCPServer("google-flow")
 
@@ -24,16 +30,28 @@ def flow_check_status() -> str:
         "message": (
             "Chrome с портом отладки активен." if cdp_active else
             "Готов к работе в скрытом Headless-режиме с сохраненными куками." if auth_exists else
-            "Требуется однократный вход в Google-аккаунт."
+            "Требуется однократный вход в Google-аккаунт через auth.py."
         )
     }, ensure_ascii=False, indent=2)
 
 @app.tool()
-def flow_generate_image(prompt: str, output_dir: str = "", timeout_seconds: int = 90) -> str:
+def flow_generate_image(
+    prompt: str,
+    reference_image: str = "",
+    aspect_ratio: str = "",
+    expand_prompt: bool = False,
+    upscale_2k: bool = False,
+    output_dir: str = "",
+    timeout_seconds: int = 90
+) -> str:
     """
     Сгенерировать высококачественное изображение через Google Flow (Imagen 3/4) в фоне.
     
     :param prompt: Детальный промпт на английском языке (стиль, освещение, композиция, детали).
+    :param reference_image: Локальный путь к изображению-референсу для генерации (Image-to-Image / Style).
+    :param aspect_ratio: Желаемое соотношение сторон: '16:9', '9:16', '1:1', '4:3'.
+    :param expand_prompt: Если True, автоматически расширяет промпт стилистическими и световыми модификаторами.
+    :param upscale_2k: Если True, сразу запрашивает и сохраняет 2K версию изображения.
     :param output_dir: Папка для сохранения сгенерированных файлов (по умолчанию: ./outputs).
     :param timeout_seconds: Максимальное время ожидания генерации (по умолчанию 90 секунд).
     """
@@ -42,6 +60,10 @@ def flow_generate_image(prompt: str, output_dir: str = "", timeout_seconds: int 
             prompt=prompt,
             output_dir=output_dir if output_dir else None,
             media_type="image",
+            reference_image=reference_image if reference_image else None,
+            aspect_ratio=aspect_ratio if aspect_ratio else None,
+            expand_prompt_flag=expand_prompt,
+            upscale_2k=upscale_2k,
             timeout_sec=timeout_seconds
         )
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -53,11 +75,23 @@ def flow_generate_image(prompt: str, output_dir: str = "", timeout_seconds: int 
         }, ensure_ascii=False, indent=2)
 
 @app.tool()
-def flow_generate_video(prompt: str, output_dir: str = "", timeout_seconds: int = 150) -> str:
+def flow_generate_video(
+    prompt: str,
+    reference_image: str = "",
+    aspect_ratio: str = "",
+    camera_motion: str = "",
+    expand_prompt: bool = False,
+    output_dir: str = "",
+    timeout_seconds: int = 150
+) -> str:
     """
     Сгенерировать кинематографичное видео через Google Flow (Veo) в фоне.
     
     :param prompt: Детальный кинематографичный промпт на английском языке (движение камеры, действие, свет).
+    :param reference_image: Локальный путь к изображению для стартового кадра / референса видео.
+    :param aspect_ratio: Желаемое соотношение сторон: '16:9', '9:16', '1:1', '4:3'.
+    :param camera_motion: Движение камеры: 'pan_left', 'pan_right', 'tilt_up', 'tilt_down', 'zoom_in', 'zoom_out', 'orbit', 'static'.
+    :param expand_prompt: Если True, автоматически расширяет промпт кинематографическими модификаторами.
     :param output_dir: Папка для сохранения сгенерированных файлов (по умолчанию: ./outputs).
     :param timeout_seconds: Максимальное время ожидания генерации (по умолчанию 150 секунд).
     """
@@ -66,6 +100,10 @@ def flow_generate_video(prompt: str, output_dir: str = "", timeout_seconds: int 
             prompt=prompt,
             output_dir=output_dir if output_dir else None,
             media_type="video",
+            reference_image=reference_image if reference_image else None,
+            aspect_ratio=aspect_ratio if aspect_ratio else None,
+            camera_motion=camera_motion if camera_motion else None,
+            expand_prompt_flag=expand_prompt,
             timeout_sec=timeout_seconds
         )
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -76,5 +114,177 @@ def flow_generate_video(prompt: str, output_dir: str = "", timeout_seconds: int 
             "prompt": prompt
         }, ensure_ascii=False, indent=2)
 
+@app.tool()
+def flow_frames_to_video(
+    start_frame: str,
+    end_frame: str,
+    prompt: str = "",
+    aspect_ratio: str = "",
+    output_dir: str = "",
+    timeout_seconds: int = 180
+) -> str:
+    """
+    Сгенерировать видео через Veo с плавной анимацией между стартовым и финальным кадрами (Frames-to-Video).
+    
+    :param start_frame: Путь к исходному изображению (первый кадр видео).
+    :param end_frame: Путь к конечному изображению (финальный кадр видео).
+    :param prompt: Опциональное описание перехода или динамики между кадрами.
+    :param aspect_ratio: Соотношение сторон видео: '16:9', '9:16', '1:1', '4:3'.
+    :param output_dir: Папка для сохранения видеофайла.
+    :param timeout_seconds: Максимальное время ожидания генерации (по умолчанию 180 секунд).
+    """
+    try:
+        result = generate_frames_to_video(
+            start_frame=start_frame,
+            end_frame=end_frame,
+            prompt=prompt,
+            aspect_ratio=aspect_ratio if aspect_ratio else None,
+            output_dir=output_dir if output_dir else None,
+            timeout_sec=timeout_seconds
+        )
+        return json.dumps(result, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "error": str(e),
+            "start_frame": start_frame,
+            "end_frame": end_frame
+        }, ensure_ascii=False, indent=2)
+
+@app.tool()
+def flow_extend_video(
+    tile_index: int = -1,
+    prompt: str = "",
+    output_dir: str = "",
+    timeout_seconds: int = 180
+) -> str:
+    """
+    Продлить ранее сгенерированный видеоролик еще на 5-8 секунд (Veo Video Extend).
+    
+    :param tile_index: Индекс плитки с видео в проекте Google Flow (-1 для последнего).
+    :param prompt: Описание продолжения действия / сюжета на английском языке.
+    :param output_dir: Папка для сохранения продленного видео.
+    :param timeout_seconds: Максимальное время ожидания генерации (по умолчанию 180 секунд).
+    """
+    try:
+        result = extend_flow_video(
+            tile_index=tile_index,
+            prompt=prompt,
+            output_dir=output_dir if output_dir else None,
+            timeout_sec=timeout_seconds
+        )
+        return json.dumps(result, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "error": str(e),
+            "tile_index": tile_index
+        }, ensure_ascii=False, indent=2)
+
+@app.tool()
+def flow_upscale_image(
+    tile_index: int = -1,
+    output_dir: str = "",
+    timeout_seconds: int = 90
+) -> str:
+    """
+    Получить 2K вариант уже сгенерированного изображения в проекте Google Flow.
+    
+    :param tile_index: Индекс плитки с изображением (-1 для последнего сгенерированного).
+    :param output_dir: Папка для сохранения 2K файла (по умолчанию: ./outputs).
+    :param timeout_seconds: Максимальное время ожидания апскейла (по умолчанию 90 секунд).
+    """
+    try:
+        result = upscale_flow_image(
+            tile_index=tile_index,
+            output_dir=output_dir if output_dir else None,
+            timeout_sec=timeout_seconds
+        )
+        return json.dumps(result, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "error": str(e),
+            "tile_index": tile_index
+        }, ensure_ascii=False, indent=2)
+
+@app.tool()
+def flow_edit_image(
+    prompt: str,
+    tile_index: int = -1,
+    reference_image: str = "",
+    aspect_ratio: str = "",
+    upscale_2k: bool = False,
+    output_dir: str = "",
+    timeout_seconds: int = 90
+) -> str:
+    """
+    Внести правки в ранее сгенерированное изображение или сгенерировать вариацию по референсу.
+    
+    :param prompt: Описание изменений или уточняющий промпт на английском языке.
+    :param tile_index: Индекс плитки с исходным изображением (-1 для последнего сгенерированного).
+    :param reference_image: Локальный путь к новому референсному изображению (если заменяет плитку).
+    :param aspect_ratio: Новое соотношение сторон: '16:9', '9:16', '1:1', '4:3'.
+    :param upscale_2k: Если True, запрашивает результат в разрешении 2K.
+    :param output_dir: Папка для сохранения файлов (по умолчанию: ./outputs).
+    :param timeout_seconds: Максимальное время ожидания (по умолчанию 90 секунд).
+    """
+    try:
+        result = edit_flow_image(
+            prompt=prompt,
+            tile_index=tile_index,
+            reference_image=reference_image if reference_image else None,
+            aspect_ratio=aspect_ratio if aspect_ratio else None,
+            upscale_2k=upscale_2k,
+            output_dir=output_dir if output_dir else None,
+            timeout_sec=timeout_seconds
+        )
+        return json.dumps(result, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "error": str(e),
+            "prompt": prompt,
+            "tile_index": tile_index
+        }, ensure_ascii=False, indent=2)
+
+@app.tool()
+def flow_finalize_asset(
+    target_path: str,
+    source_file: str = "",
+    tile_index: int = -1,
+    upscale_2k: bool = True,
+    timeout_seconds: int = 90
+) -> str:
+    """
+    Финализировать черновик (Шаг 3 Studio Pipeline): атомарно апскейлит изображение до 2K и копирует в проект пользователя.
+    
+    :param target_path: Целевой путь для сохранения файла в проекте (например: 'src/assets/hero.png' или 'public/logo.png').
+    :param source_file: Локальный путь к сгенерированному черновику.
+    :param tile_index: Индекс плитки во Flow для апскейла (-1 для последней плитки).
+    :param upscale_2k: Если True и ассет является изображением, выполняет 2K апскейл перед копированием.
+    :param timeout_seconds: Максимальное время ожидания финализации (по умолчанию 90 секунд).
+    """
+    try:
+        result = finalize_asset(
+            target_path=target_path,
+            source_file=source_file if source_file else None,
+            tile_index=tile_index,
+            upscale_2k=upscale_2k,
+            timeout_sec=timeout_seconds
+        )
+        return json.dumps(result, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "error": str(e),
+            "target_path": target_path
+        }, ensure_ascii=False, indent=2)
+
 if __name__ == "__main__":
+    if hasattr(sys.stdout, "buffer") and sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+        try:
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        except Exception:
+            pass
     app.run(transport="stdio")
