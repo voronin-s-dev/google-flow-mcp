@@ -102,28 +102,24 @@ def set_aspect_ratio(page, aspect_ratio: Optional[str]) -> bool:
         return False
 
     print(f"[*] Установка соотношения сторон: {ratio}")
-    # Вариант 1: Прямая кнопка с соотношением
+    # Открываем меню настроек генератора в строке ввода
+    trig = page.locator("button[aria-label*='Триггер' i], button:has-text('Nano Banana')").first
+    if trig.is_visible(timeout=1000):
+        trig.click()
+        page.wait_for_timeout(500)
+        btn_ratio = page.locator(f"button:has-text('{ratio}'), [role='menuitem']:has-text('{ratio}'), [role='option']:has-text('{ratio}')").first
+        if btn_ratio.is_visible(timeout=1500):
+            btn_ratio.click()
+            page.wait_for_timeout(400)
+            return True
+
+    # Вариант 2: Прямая кнопка с соотношением
     for sel in [f"button:has-text('{ratio}')", f"button[aria-label*='{ratio}']", f"[data-testid*='{ratio}']"]:
         btn = page.locator(sel).first
         if btn.is_visible(timeout=400):
             btn.click()
             return True
 
-    # Вариант 2: Клик по меню соотношения сторон
-    menu_selectors = [
-        "button[aria-label*='соотношение' i]",
-        "button[aria-label*='aspect' i]",
-        "button[aria-label*='размер' i]",
-        "[data-testid*='aspect-ratio']"
-    ]
-    for menu_sel in menu_selectors:
-        menu_btn = page.locator(menu_sel).first
-        if menu_btn.is_visible(timeout=500):
-            menu_btn.click()
-            option = page.locator(f"[role='menuitem']:has-text('{ratio}'), [role='option']:has-text('{ratio}'), button:has-text('{ratio}')").first
-            if option.is_visible(timeout=1000):
-                option.click()
-                return True
     return False
 
 def attach_reference_image(page, image_path: str) -> bool:
@@ -136,7 +132,31 @@ def attach_reference_image(page, image_path: str) -> bool:
 
     print(f"[*] Прикрепление референсного изображения: {resolved_path}")
 
-    # Способ 1: Прямая передача в существующие input[type='file']
+    # Способ 1: Загрузка через нативную кнопку загрузки медиа на холст
+    up_btn = page.locator("button:has-text('upload')").first
+    if up_btn.is_visible(timeout=1200):
+        try:
+            with page.expect_file_chooser(timeout=3000) as fc:
+                up_btn.click()
+            fc.value.set_files(str(resolved_path))
+            print("[+] Файл передан через кнопку upload на холст")
+            page.wait_for_timeout(2500)
+
+            # Добавляем загруженный файл в строку запроса (Ингредиенты)
+            ing_btn = page.locator("button[aria-label*='ингредиенты' i], button[aria-label*='ingredients' i]").first
+            if ing_btn.is_visible(timeout=2000):
+                ing_btn.click()
+                page.wait_for_timeout(800)
+                btn_add = page.locator("button:has-text('Добавить в запрос'), button:has-text('Add to prompt')").first
+                if btn_add.is_visible(timeout=2000):
+                    btn_add.click()
+                    page.wait_for_timeout(500)
+                    print("[+] Референс прикреплен к строке запроса!")
+                    return True
+        except Exception as e:
+            print(f"[-] Ошибка загрузки через кнопку upload: {e}")
+
+    # Способ 2: Прямая передача в существующие input[type='file']
     file_inputs = page.locator("input[type='file']").all()
     for fi in file_inputs:
         try:
@@ -146,36 +166,6 @@ def attach_reference_image(page, image_path: str) -> bool:
         except Exception:
             pass
 
-    # Способ 2: Поиск кнопок добавления референса / загрузки файла
-    upload_selectors = [
-        "button[aria-label*='изображение' i]",
-        "button[aria-label*='image' i]",
-        "button[aria-label*='прикрепить' i]",
-        "button[aria-label*='attach' i]",
-        "button[aria-label*='загрузить' i]",
-        "button[aria-label*='upload' i]",
-        "button[aria-label*='добавить' i]",
-        "button[aria-label*='add' i]",
-        "[data-testid*='upload' i]",
-        "[data-testid*='attach' i]",
-        "button:has-text('Add')",
-        "button:has-text('Загрузить')",
-    ]
-
-    for sel in upload_selectors:
-        btns = page.locator(sel).all()
-        for btn in btns:
-            if btn.is_visible():
-                try:
-                    with page.expect_file_chooser(timeout=3000) as fc_info:
-                        btn.click()
-                    fc_info.value.set_files(str(resolved_path))
-                    print(f"[+] Референс прикреплен через file chooser ({sel})")
-                    return True
-                except Exception:
-                    continue
-
-    print("[-] Предупреждение: Кнопка загрузки файла не найдена, генерация продолжится без референса.")
     return False
 
 def attach_end_frame(page, image_path: str) -> bool:

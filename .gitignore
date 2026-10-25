@@ -14,6 +14,9 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Generated outputs & downloads
 outputs/
@@ -28,3 +31,4 @@ outputs/
 Thumbs.db
 .idea/
 .vscode/
+*.tmp

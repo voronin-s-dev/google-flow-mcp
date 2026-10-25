@@ -7,7 +7,7 @@
 
 ## 🏗 Архитектура и компоненты
 
-### 1. Ядро проекта (`C:\Antigravity projects\Google flow mcp`)
+### 1. Ядро проекта
 - **`server.py`**: MCP-сервер (протокол stdio), объявляющий инструменты для агентских сред (Antigravity, Claude Desktop, Cursor).
 - **`engine.py`**: Движок автоматизации на базе Playwright (поддерживает подключение через Chrome DevTools Protocol на порту 9222 или тихий автономный headless-режим с использованием локального файла сессии `storage_state.json`).
 - **`auth.py`**: Скрипт интерактивного первого входа для сохранения сессионных куков.
@@ -15,9 +15,9 @@
 - **Виртуальное окружение**: Управляется через `uv` (Python 3.14). Запуск команд через `.venv\Scripts\python.exe` или `uv run`.
 
 ### 2. Внешняя интеграция и скиллы
-- **Схемы инструментов MCP**: `C:\Users\voron\.gemini\antigravity\mcp\google-flow\*.json`
-- **Конфигурация MCP**: `C:\Users\voron\.gemini\config\mcp_config.json`
-- **Глобальный агентский скилл**: `C:\Users\voron\.gemini\config\skills\google-flow-generator` (CLI-клиент `flow_client.py` и документация использования для агентов).
+- **Схемы инструментов MCP**: `~/.gemini/antigravity/mcp/google-flow/*.json`
+- **Конфигурация MCP**: `~/.gemini/config/mcp_config.json`
+- **Глобальный агентский скилл**: `~/.gemini/config/skills/google-flow-generator` (CLI-клиент `flow_client.py` и документация использования для агентов).
 
 ---
 
@@ -41,7 +41,7 @@
 
 ### 2. Синхронизация MCP-инструментов (Single Source of Truth)
 Любое изменение или добавление инструмента в `server.py` **обязательно** сопровождается:
-1. Автоматической генерацией / обновлением JSON-схем в `C:\Users\voron\.gemini\antigravity\mcp\google-flow\`.
+1. Автоматической генерацией / обновлением JSON-схем в `~/.gemini/antigravity/mcp/google-flow/`.
 2. Обновлением параметров в CLI-клиенте `google-flow-generator/scripts/flow_client.py`.
 3. Обновлением описания в `google-flow-generator/SKILL.md`.
 4. Внесением записи в хронологию и ADR файла `PROJECT_MEMORY.md`.

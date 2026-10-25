@@ -13,7 +13,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 import server
 
-SCHEMAS_DIR = Path("C:/Users/voron/.gemini/antigravity/mcp/google-flow")
+SCHEMAS_DIR = Path.home() / ".gemini" / "antigravity" / "mcp" / "google-flow"
 
 def sync_schemas():
     SCHEMAS_DIR.mkdir(parents=True, exist_ok=True)

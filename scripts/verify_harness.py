@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-MCP_SCHEMAS_DIR = Path("C:/Users/voron/.gemini/antigravity/mcp/google-flow")
+MCP_SCHEMAS_DIR = Path.home() / ".gemini" / "antigravity" / "mcp" / "google-flow"
 CDP_URL = "http://127.0.0.1:9222"
 
 def check_mcp_contract() -> Tuple[bool, List[str]]:
