@@ -100,29 +100,39 @@ def check_dom_selectors() -> Tuple[bool, List[str]]:
             # Проверяемые ключевые элементы
             checks = [
                 ("Поле ввода промпта", [
-                    "textarea",
+                    "div.ProseMirror[role='textbox']",
+                    "div.ProseMirror",
                     "[contenteditable='true']",
+                    "textarea",
                     "[placeholder*='prompt' i]",
                     "[placeholder*='опишите' i]",
                     "[aria-label*='prompt' i]"
                 ]),
                 ("Кнопка запуска генерации", [
+                    "button:has(mat-icon:has-text('arrow_forward'))",
+                    "button[aria-label*='Начать генерацию' i]",
                     "button[aria-label*='generate' i]",
                     "button[aria-label*='создать' i]",
-                    "button[aria-label*='create' i]",
-                    "button:has-text('Generate')",
-                    "button:has-text('Создать')"
+                    "button[type='submit']",
+                    "button:has-text('Generate')"
                 ]),
                 ("Селектор референсного файла", [
+                    "flow-base-prompt-box button:has-text('add')",
+                    "button[aria-label*='Добавить ингредиенты' i]",
+                    "button:has(mat-icon:has-text('add'))",
+                    "flow-image-ingredient-chip",
                     "input[type='file']",
                     "button[aria-label*='image' i]",
-                    "button[aria-label*='референс' i]",
                     "button[aria-label*='attach' i]"
                 ]),
                 ("Область плиток / результатов", [
+                    ".thumbnail-image",
+                    ".read-only-image",
+                    "flow-media-tile",
+                    "img[src*='flow-content.google']",
+                    "img[src*='/asb/']",
                     "flow-tile",
-                    "[class*='tile']",
-                    "[data-testid*='tile']"
+                    "[class*='tile']"
                 ])
             ]
 

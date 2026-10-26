@@ -39,17 +39,19 @@ def flow_generate_image(
     prompt: str,
     reference_image: str = "",
     aspect_ratio: str = "",
+    model_name: str = "nano_banana_2.1",
     expand_prompt: bool = False,
     upscale_2k: bool = False,
     output_dir: str = "",
     timeout_seconds: int = 90
 ) -> str:
     """
-    Сгенерировать высококачественное изображение через Google Flow (Imagen 3/4) в фоне.
+    Сгенерировать высококачественное изображение через Google Flow в фоне.
     
     :param prompt: Детальный промпт на английском языке (стиль, освещение, композиция, детали).
     :param reference_image: Локальный путь к изображению-референсу для генерации (Image-to-Image / Style).
     :param aspect_ratio: Желаемое соотношение сторон: '16:9', '9:16', '1:1', '4:3'.
+    :param model_name: Модель: 'nano_banana_2.1', 'nano_banana_pro', 'nano_banana_2_lite'.
     :param expand_prompt: Если True, автоматически расширяет промпт стилистическими и световыми модификаторами.
     :param upscale_2k: Если True, сразу запрашивает и сохраняет 2K версию изображения.
     :param output_dir: Папка для сохранения сгенерированных файлов (по умолчанию: ./outputs).
@@ -62,8 +64,10 @@ def flow_generate_image(
             media_type="image",
             reference_image=reference_image if reference_image else None,
             aspect_ratio=aspect_ratio if aspect_ratio else None,
+            camera_motion=None,
             expand_prompt_flag=expand_prompt,
             upscale_2k=upscale_2k,
+            model_name=model_name,
             timeout_sec=timeout_seconds
         )
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -214,6 +218,7 @@ def flow_edit_image(
     tile_index: int = -1,
     reference_image: str = "",
     aspect_ratio: str = "",
+    model_name: str = "nano_banana_2.1",
     upscale_2k: bool = False,
     output_dir: str = "",
     timeout_seconds: int = 90
@@ -225,6 +230,7 @@ def flow_edit_image(
     :param tile_index: Индекс плитки с исходным изображением (-1 для последнего сгенерированного).
     :param reference_image: Локальный путь к новому референсному изображению (если заменяет плитку).
     :param aspect_ratio: Новое соотношение сторон: '16:9', '9:16', '1:1', '4:3'.
+    :param model_name: Модель: 'nano_banana_2.1', 'nano_banana_pro', 'nano_banana_2_lite'.
     :param upscale_2k: Если True, запрашивает результат в разрешении 2K.
     :param output_dir: Папка для сохранения файлов (по умолчанию: ./outputs).
     :param timeout_seconds: Максимальное время ожидания (по умолчанию 90 секунд).
@@ -237,6 +243,7 @@ def flow_edit_image(
             aspect_ratio=aspect_ratio if aspect_ratio else None,
             upscale_2k=upscale_2k,
             output_dir=output_dir if output_dir else None,
+            model_name=model_name,
             timeout_sec=timeout_seconds
         )
         return json.dumps(result, ensure_ascii=False, indent=2)
