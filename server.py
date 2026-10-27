@@ -3,6 +3,7 @@ import sys
 import io
 from pathlib import Path
 from mcp.server.mcpserver import MCPServer
+from mcp.types import ToolAnnotations
 from engine import (
     generate_flow_media,
     generate_frames_to_video,
@@ -16,25 +17,45 @@ from engine import (
 
 app = MCPServer("google-flow")
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False
+    )
+)
 def flow_check_status() -> str:
     """
     Проверить доступность Google Flow и статус авторизации (CDP / Headless).
     """
-    cdp_active = is_cdp_available()
-    auth_exists = STORAGE_FILE.exists()
-    return json.dumps({
-        "status": "ready" if (cdp_active or auth_exists) else "needs_auth",
-        "cdp_active": cdp_active,
-        "headless_auth_saved": auth_exists,
-        "message": (
-            "Chrome с портом отладки активен." if cdp_active else
-            "Готов к работе в скрытом Headless-режиме с сохраненными куками." if auth_exists else
-            "Требуется однократный вход в Google-аккаунт через auth.py."
-        )
-    }, ensure_ascii=False, indent=2)
+    try:
+        cdp_active = is_cdp_available()
+        auth_exists = STORAGE_FILE.exists()
+        return json.dumps({
+            "status": "ready" if (cdp_active or auth_exists) else "needs_auth",
+            "cdp_active": cdp_active,
+            "headless_auth_saved": auth_exists,
+            "message": (
+                "Chrome с портом отладки активен." if cdp_active else
+                "Готов к работе в скрытом Headless-режиме с сохраненными куками." if auth_exists else
+                "Требуется однократный вход в Google-аккаунт через auth.py."
+            )
+        }, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return json.dumps({
+            "status": "error",
+            "error": str(e)
+        }, ensure_ascii=False, indent=2)
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=True
+    )
+)
 def flow_generate_image(
     prompt: str,
     reference_image: str = "",
@@ -78,7 +99,14 @@ def flow_generate_image(
             "prompt": prompt
         }, ensure_ascii=False, indent=2)
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=True
+    )
+)
 def flow_generate_video(
     prompt: str,
     reference_image: str = "",
@@ -118,7 +146,14 @@ def flow_generate_video(
             "prompt": prompt
         }, ensure_ascii=False, indent=2)
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=True
+    )
+)
 def flow_frames_to_video(
     start_frame: str,
     end_frame: str,
@@ -155,7 +190,14 @@ def flow_frames_to_video(
             "end_frame": end_frame
         }, ensure_ascii=False, indent=2)
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=True
+    )
+)
 def flow_extend_video(
     tile_index: int = -1,
     prompt: str = "",
@@ -185,7 +227,14 @@ def flow_extend_video(
             "tile_index": tile_index
         }, ensure_ascii=False, indent=2)
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True
+    )
+)
 def flow_upscale_image(
     tile_index: int = -1,
     output_dir: str = "",
@@ -212,7 +261,14 @@ def flow_upscale_image(
             "tile_index": tile_index
         }, ensure_ascii=False, indent=2)
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=True
+    )
+)
 def flow_edit_image(
     prompt: str,
     tile_index: int = -1,
@@ -255,7 +311,14 @@ def flow_edit_image(
             "tile_index": tile_index
         }, ensure_ascii=False, indent=2)
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True
+    )
+)
 def flow_finalize_asset(
     target_path: str,
     source_file: str = "",

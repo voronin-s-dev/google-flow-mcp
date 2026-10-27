@@ -3,6 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Playwright](https://img.shields.io/badge/playwright-v1.40+-green.svg)](https://playwright.dev/)
+[![M8ven Score](https://m8ven.ai/badge/mcp/voronin-s-dev/google-flow-mcp)](https://m8ven.ai/mcp/voronin-s-dev/google-flow-mcp?s=readme)
 
 An MCP (Model Context Protocol) server that empowers AI agents (Antigravity, Claude Desktop, Cursor) to generate production-quality visual media using **Google Flow** (powered by Imagen and Veo models) completely in the background, with **zero per-token API costs** by leveraging your Google AI Pro subscription.
 
@@ -46,7 +47,7 @@ flowchart LR
 ### 1. Installation
 
 ```bash
-git clone https://github.com/your-username/google-flow-mcp.git
+git clone https://github.com/voronin-s-dev/google-flow-mcp.git
 cd google-flow-mcp
 uv venv
 uv pip install -r requirements.txt
@@ -77,6 +78,32 @@ A browser window will open. Sign in to your Google Account with Google AI Pro ac
 | **`flow_upscale_image`** | `tile_index` (int, default: -1)<br>`output_dir` (string, optional)<br>`timeout_seconds` (int, default: 90) | Upscales a previously generated image in the project to 2K resolution. |
 | **`flow_edit_image`** | `prompt` (string, required)<br>`tile_index` (int, default: -1)<br>`reference_image` (string, optional)<br>`aspect_ratio` (string, optional)<br>`upscale_2k` (bool, default: False)<br>`output_dir` (string, optional)<br>`timeout_seconds` (int, default: 90) | Applies modifications or creates variations of an existing image. |
 | **`flow_check_status`** | *none* | Checks whether the session is authenticated and ready to generate. |
+
+---
+
+## 🔒 Security, Privacy & Architecture
+
+* **Local-First & Off-Cloud Execution**: The MCP server runs exclusively on your local workstation. It requires no intermediary cloud proxy or external telemetry service.
+* **Controlled Network Endpoints**: All network communications are strictly bounded to:
+  1. `https://flow.google.com` (Google's official web studio endpoint).
+  2. `127.0.0.1:9222` (Local Chrome DevTools Protocol port, bound only to the local loopback interface).
+* **Safe Credential Isolation**: Google session cookies (`storage_state.json`) and temporary Chrome profile data are stored locally and explicitly protected via `.gitignore` to prevent leakage.
+* **MCP Tool Annotations**: Every exposed tool declares strict safety hints (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) following MCP specifications, enabling client hosts to reason about side effects before execution.
+* **Privacy Policy**: See detailed privacy terms in [PRIVACY.md](PRIVACY.md).
+
+---
+
+## 🧪 Testing & Verification
+
+Run the test suite and contract harness:
+
+```bash
+# Run unit & contract tests
+uv run pytest
+
+# Run contract and live CDP selector verification
+uv run python scripts/verify_harness.py
+```
 
 ---
 

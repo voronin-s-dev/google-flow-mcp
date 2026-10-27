@@ -26,6 +26,8 @@ def sync_schemas():
             "description": tool.description,
             "parameters": tool.input_schema
         }
+        if tool.annotations:
+            schema_data["annotations"] = tool.annotations.model_dump(by_alias=True, exclude_none=True)
         dest_file = SCHEMAS_DIR / f"{tool.name}.json"
         with open(dest_file, "w", encoding="utf-8") as f:
             json.dump(schema_data, f, ensure_ascii=False, indent=2)
