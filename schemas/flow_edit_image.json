@@ -1,0 +1,58 @@
+{
+  "name": "flow_edit_image",
+  "description": "\nВнести правки в ранее сгенерированное изображение или сгенерировать вариацию по референсу.\n\n:param prompt: Описание изменений или уточняющий промпт на английском языке.\n:param tile_index: Индекс плитки с исходным изображением (-1 для последнего сгенерированного).\n:param reference_image: Локальный путь к новому референсному изображению (если заменяет плитку).\n:param aspect_ratio: Новое соотношение сторон: '16:9', '9:16', '1:1', '4:3'.\n:param model_name: Модель: 'nano_banana_2.1', 'nano_banana_pro', 'nano_banana_2_lite'.\n:param upscale_2k: Если True, запрашивает результат в разрешении 2K.\n:param output_dir: Папка для сохранения файлов (по умолчанию: ./outputs).\n:param timeout_seconds: Максимальное время ожидания (по умолчанию 90 секунд).\n",
+  "parameters": {
+    "properties": {
+      "prompt": {
+        "title": "Prompt",
+        "type": "string"
+      },
+      "tile_index": {
+        "default": -1,
+        "title": "Tile Index",
+        "type": "integer"
+      },
+      "reference_image": {
+        "default": "",
+        "title": "Reference Image",
+        "type": "string"
+      },
+      "aspect_ratio": {
+        "default": "",
+        "title": "Aspect Ratio",
+        "type": "string"
+      },
+      "model_name": {
+        "default": "nano_banana_2.1",
+        "title": "Model Name",
+        "type": "string"
+      },
+      "upscale_2k": {
+        "default": false,
+        "title": "Upscale 2K",
+        "type": "boolean"
+      },
+      "output_dir": {
+        "default": "",
+        "title": "Output Dir",
+        "type": "string"
+      },
+      "timeout_seconds": {
+        "default": 90,
+        "title": "Timeout Seconds",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "prompt"
+    ],
+    "title": "flow_edit_imageArguments",
+    "type": "object"
+  },
+  "annotations": {
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": true
+  }
+}

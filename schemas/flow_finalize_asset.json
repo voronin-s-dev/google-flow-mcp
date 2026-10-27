@@ -1,0 +1,43 @@
+{
+  "name": "flow_finalize_asset",
+  "description": "\nФинализировать черновик (Шаг 3 Studio Pipeline): атомарно апскейлит изображение до 2K и копирует в проект пользователя.\n\n:param target_path: Целевой путь для сохранения файла в проекте (например: 'src/assets/hero.png' или 'public/logo.png').\n:param source_file: Локальный путь к сгенерированному черновику.\n:param tile_index: Индекс плитки во Flow для апскейла (-1 для последней плитки).\n:param upscale_2k: Если True и ассет является изображением, выполняет 2K апскейл перед копированием.\n:param timeout_seconds: Максимальное время ожидания финализации (по умолчанию 90 секунд).\n",
+  "parameters": {
+    "properties": {
+      "target_path": {
+        "title": "Target Path",
+        "type": "string"
+      },
+      "source_file": {
+        "default": "",
+        "title": "Source File",
+        "type": "string"
+      },
+      "tile_index": {
+        "default": -1,
+        "title": "Tile Index",
+        "type": "integer"
+      },
+      "upscale_2k": {
+        "default": true,
+        "title": "Upscale 2K",
+        "type": "boolean"
+      },
+      "timeout_seconds": {
+        "default": 90,
+        "title": "Timeout Seconds",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "target_path"
+    ],
+    "title": "flow_finalize_assetArguments",
+    "type": "object"
+  },
+  "annotations": {
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": true
+  }
+}

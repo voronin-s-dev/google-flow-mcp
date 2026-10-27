@@ -1,0 +1,58 @@
+{
+  "name": "flow_generate_image",
+  "description": "\nСгенерировать высококачественное изображение через Google Flow в фоне.\n\n:param prompt: Детальный промпт на английском языке (стиль, освещение, композиция, детали).\n:param reference_image: Локальный путь к изображению-референсу для генерации (Image-to-Image / Style).\n:param aspect_ratio: Желаемое соотношение сторон: '16:9', '9:16', '1:1', '4:3'.\n:param model_name: Модель: 'nano_banana_2.1', 'nano_banana_pro', 'nano_banana_2_lite'.\n:param expand_prompt: Если True, автоматически расширяет промпт стилистическими и световыми модификаторами.\n:param upscale_2k: Если True, сразу запрашивает и сохраняет 2K версию изображения.\n:param output_dir: Папка для сохранения сгенерированных файлов (по умолчанию: ./outputs).\n:param timeout_seconds: Максимальное время ожидания генерации (по умолчанию 90 секунд).\n",
+  "parameters": {
+    "properties": {
+      "prompt": {
+        "title": "Prompt",
+        "type": "string"
+      },
+      "reference_image": {
+        "default": "",
+        "title": "Reference Image",
+        "type": "string"
+      },
+      "aspect_ratio": {
+        "default": "",
+        "title": "Aspect Ratio",
+        "type": "string"
+      },
+      "model_name": {
+        "default": "nano_banana_2.1",
+        "title": "Model Name",
+        "type": "string"
+      },
+      "expand_prompt": {
+        "default": false,
+        "title": "Expand Prompt",
+        "type": "boolean"
+      },
+      "upscale_2k": {
+        "default": false,
+        "title": "Upscale 2K",
+        "type": "boolean"
+      },
+      "output_dir": {
+        "default": "",
+        "title": "Output Dir",
+        "type": "string"
+      },
+      "timeout_seconds": {
+        "default": 90,
+        "title": "Timeout Seconds",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "prompt"
+    ],
+    "title": "flow_generate_imageArguments",
+    "type": "object"
+  },
+  "annotations": {
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": true
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "name": "flow_extend_video",
+  "description": "\nПродлить ранее сгенерированный видеоролик еще на 5-8 секунд (Veo Video Extend).\n\n:param tile_index: Индекс плитки с видео в проекте Google Flow (-1 для последнего).\n:param prompt: Описание продолжения действия / сюжета на английском языке.\n:param output_dir: Папка для сохранения продленного видео.\n:param timeout_seconds: Максимальное время ожидания генерации (по умолчанию 180 секунд).\n",
+  "parameters": {
+    "properties": {
+      "tile_index": {
+        "default": -1,
+        "title": "Tile Index",
+        "type": "integer"
+      },
+      "prompt": {
+        "default": "",
+        "title": "Prompt",
+        "type": "string"
+      },
+      "output_dir": {
+        "default": "",
+        "title": "Output Dir",
+        "type": "string"
+      },
+      "timeout_seconds": {
+        "default": 180,
+        "title": "Timeout Seconds",
+        "type": "integer"
+      }
+    },
+    "title": "flow_extend_videoArguments",
+    "type": "object"
+  },
+  "annotations": {
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": true
+  }
+}

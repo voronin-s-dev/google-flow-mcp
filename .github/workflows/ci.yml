@@ -24,6 +24,14 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    - name: Generate and verify MCP schemas
+      run: |
+        python scripts/generate_mcp_schemas.py
+
     - name: Run Pytest suite
       run: |
         pytest
+
+    - name: Run Verification Harness
+      run: |
+        python scripts/verify_harness.py

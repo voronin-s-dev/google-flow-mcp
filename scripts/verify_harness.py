@@ -7,18 +7,31 @@ import sys
 import io
 import json
 import argparse
+import os
 import urllib.request
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-MCP_SCHEMAS_DIR = Path.home() / ".gemini" / "antigravity" / "mcp" / "google-flow"
+REPO_SCHEMAS_DIR = PROJECT_ROOT / "schemas"
+GLOBAL_SCHEMAS_DIR = Path.home() / ".gemini" / "antigravity" / "mcp" / "google-flow"
 CDP_URL = "http://127.0.0.1:9222"
 
-def check_mcp_contract() -> Tuple[bool, List[str]]:
+def get_schemas_dir() -> Path:
+    env_dir = os.environ.get("MCP_SCHEMAS_DIR")
+    if env_dir:
+        return Path(env_dir)
+    if REPO_SCHEMAS_DIR.exists():
+        return REPO_SCHEMAS_DIR
+    return GLOBAL_SCHEMAS_DIR
+
+def check_mcp_contract(schemas_dir: Path | None = None) -> Tuple[bool, List[str]]:
     """
     Проверяет, что каждый инструмент в server.py имеет соответствующую и актуальную JSON-схему.
     """
+    if schemas_dir is None:
+        schemas_dir = get_schemas_dir()
+
     errors = []
     sys.path.insert(0, str(PROJECT_ROOT))
     import asyncio
@@ -27,17 +40,17 @@ def check_mcp_contract() -> Tuple[bool, List[str]]:
     tools = asyncio.run(server.app.list_tools())
     server_tool_names = {t.name: t for t in tools}
 
-    if not MCP_SCHEMAS_DIR.exists():
-        errors.append(f"Директория схем MCP не найдена: {MCP_SCHEMAS_DIR}")
+    if not schemas_dir.exists():
+        errors.append(f"Директория схем MCP не найдена: {schemas_dir}")
         return False, errors
 
-    schema_files = list(MCP_SCHEMAS_DIR.glob("*.json"))
+    schema_files = list(schemas_dir.glob("*.json"))
     schema_tool_names = {f.stem: f for f in schema_files}
 
     # 1. Проверка наличия схем для всех инструментов
     for tool_name, tool_obj in server_tool_names.items():
         if tool_name not in schema_tool_names:
-            errors.append(f"[MCP Contract Error] Для инструмента '{tool_name}' отсутствует схема: {MCP_SCHEMAS_DIR / f'{tool_name}.json'}")
+            errors.append(f"[MCP Contract Error] Для инструмента '{tool_name}' отсутствует схема: {schemas_dir / f'{tool_name}.json'}")
         else:
             # Сверяем обязательные аргументы
             schema_path = schema_tool_names[tool_name]

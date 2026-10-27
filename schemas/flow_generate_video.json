@@ -1,0 +1,53 @@
+{
+  "name": "flow_generate_video",
+  "description": "\nСгенерировать кинематографичное видео через Google Flow (Veo) в фоне.\n\n:param prompt: Детальный кинематографичный промпт на английском языке (движение камеры, действие, свет).\n:param reference_image: Локальный путь к изображению для стартового кадра / референса видео.\n:param aspect_ratio: Желаемое соотношение сторон: '16:9', '9:16', '1:1', '4:3'.\n:param camera_motion: Движение камеры: 'pan_left', 'pan_right', 'tilt_up', 'tilt_down', 'zoom_in', 'zoom_out', 'orbit', 'static'.\n:param expand_prompt: Если True, автоматически расширяет промпт кинематографическими модификаторами.\n:param output_dir: Папка для сохранения сгенерированных файлов (по умолчанию: ./outputs).\n:param timeout_seconds: Максимальное время ожидания генерации (по умолчанию 150 секунд).\n",
+  "parameters": {
+    "properties": {
+      "prompt": {
+        "title": "Prompt",
+        "type": "string"
+      },
+      "reference_image": {
+        "default": "",
+        "title": "Reference Image",
+        "type": "string"
+      },
+      "aspect_ratio": {
+        "default": "",
+        "title": "Aspect Ratio",
+        "type": "string"
+      },
+      "camera_motion": {
+        "default": "",
+        "title": "Camera Motion",
+        "type": "string"
+      },
+      "expand_prompt": {
+        "default": false,
+        "title": "Expand Prompt",
+        "type": "boolean"
+      },
+      "output_dir": {
+        "default": "",
+        "title": "Output Dir",
+        "type": "string"
+      },
+      "timeout_seconds": {
+        "default": 150,
+        "title": "Timeout Seconds",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "prompt"
+    ],
+    "title": "flow_generate_videoArguments",
+    "type": "object"
+  },
+  "annotations": {
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": true
+  }
+}

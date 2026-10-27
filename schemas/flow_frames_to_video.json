@@ -1,0 +1,48 @@
+{
+  "name": "flow_frames_to_video",
+  "description": "\nСгенерировать видео через Veo с плавной анимацией между стартовым и финальным кадрами (Frames-to-Video).\n\n:param start_frame: Путь к исходному изображению (первый кадр видео).\n:param end_frame: Путь к конечному изображению (финальный кадр видео).\n:param prompt: Опциональное описание перехода или динамики между кадрами.\n:param aspect_ratio: Соотношение сторон видео: '16:9', '9:16', '1:1', '4:3'.\n:param output_dir: Папка для сохранения видеофайла.\n:param timeout_seconds: Максимальное время ожидания генерации (по умолчанию 180 секунд).\n",
+  "parameters": {
+    "properties": {
+      "start_frame": {
+        "title": "Start Frame",
+        "type": "string"
+      },
+      "end_frame": {
+        "title": "End Frame",
+        "type": "string"
+      },
+      "prompt": {
+        "default": "",
+        "title": "Prompt",
+        "type": "string"
+      },
+      "aspect_ratio": {
+        "default": "",
+        "title": "Aspect Ratio",
+        "type": "string"
+      },
+      "output_dir": {
+        "default": "",
+        "title": "Output Dir",
+        "type": "string"
+      },
+      "timeout_seconds": {
+        "default": 180,
+        "title": "Timeout Seconds",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "start_frame",
+      "end_frame"
+    ],
+    "title": "flow_frames_to_videoArguments",
+    "type": "object"
+  },
+  "annotations": {
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": true
+  }
+}
