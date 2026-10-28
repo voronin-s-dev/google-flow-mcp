@@ -5,13 +5,14 @@ Google Flow MCP — Prompt Expander & Cinematic Director
 
 from typing import Optional, Dict
 
-ASPECT_RATIOS = ["16:9", "9:16", "1:1", "4:3"]
+ASPECT_RATIOS = ["16:9", "9:16", "1:1", "4:3", "3:4"]
 
 ASPECT_FRAMING: Dict[str, str] = {
     "16:9": "widescreen 16:9 cinematic framing",
     "9:16": "vertical 9:16 mobile composition",
     "1:1": "centered 1:1 square framing",
-    "4:3": "classic 4:3 ratio composition"
+    "4:3": "classic 4:3 ratio composition",
+    "3:4": "vertical 3:4 portrait ratio composition"
 }
 
 CAMERA_MOTIONS: Dict[str, str] = {
@@ -104,6 +105,8 @@ def validate_aspect_ratio(aspect_ratio: Optional[str]) -> Optional[str]:
         "1:1": "1:1",
         "square": "1:1",
         "4:3": "4:3",
-        "4/3": "4:3"
+        "4/3": "4:3",
+        "3:4": "3:4",
+        "3/4": "3:4"
     }
     return mapping.get(cleaned, None)

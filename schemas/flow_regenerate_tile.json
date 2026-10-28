@@ -1,0 +1,31 @@
+{
+  "name": "flow_regenerate_tile",
+  "description": "\nПерезапустить генерацию выбранной плитки на холсте Google Flow ('Сгенерировать повторно').\n\n:param tile_index: Индекс плитки на холсте (-1 для последней созданной плитки).\n:param output_dir: Папка для сохранения повторно сгенерированного файла.\n:param timeout_seconds: Максимальное время ожидания генерации (по умолчанию 90 секунд).\n",
+  "parameters": {
+    "properties": {
+      "tile_index": {
+        "default": -1,
+        "title": "Tile Index",
+        "type": "integer"
+      },
+      "output_dir": {
+        "default": "",
+        "title": "Output Dir",
+        "type": "string"
+      },
+      "timeout_seconds": {
+        "default": 90,
+        "title": "Timeout Seconds",
+        "type": "integer"
+      }
+    },
+    "title": "flow_regenerate_tileArguments",
+    "type": "object"
+  },
+  "annotations": {
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": true
+  }
+}

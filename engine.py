@@ -22,6 +22,7 @@ CDP_URL = "http://127.0.0.1:9222"
 FLOW_URL = "https://flow.google.com"
 BASE_DIR = Path(__file__).parent.resolve()
 STORAGE_FILE = BASE_DIR / "storage_state.json"
+PROFILE_DIR = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "GoogleFlowAgentProfile"
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
 
@@ -31,6 +32,43 @@ def is_cdp_available() -> bool:
             return resp.status == 200
     except Exception:
         return False
+
+def get_flow_context(p):
+    """
+    Создает или подключается к контексту браузера с поддержкой CDP, нативного профиля или сохраненной сессии.
+    Возвращает кортеж (context, browser, is_headless).
+    """
+    if is_cdp_available():
+        browser = p.chromium.connect_over_cdp(CDP_URL)
+        return browser.contexts[0], browser, False
+
+    if PROFILE_DIR.exists():
+        context = p.chromium.launch_persistent_context(
+            user_data_dir=str(PROFILE_DIR),
+            channel="chrome",
+            headless=True,
+            args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+            viewport={"width": 1920, "height": 1080}
+        )
+        return context, None, True
+
+    if STORAGE_FILE.exists():
+        browser = p.chromium.launch(
+            channel="chrome",
+            headless=True,
+            args=["--disable-blink-features=AutomationControlled", "--no-sandbox"]
+        )
+        context = browser.new_context(
+            storage_state=str(STORAGE_FILE),
+            user_agent=USER_AGENT,
+            viewport={"width": 1920, "height": 1080}
+        )
+        return context, browser, True
+
+    raise RuntimeError(
+        f"Авторизационные данные Google Flow не найдены. "
+        "Запустите login.bat для однократного входа в Google-аккаунт."
+    )
 
 def get_or_create_page(context):
     for page in context.pages:
@@ -197,6 +235,67 @@ def set_aspect_ratio(page, aspect_ratio: Optional[str]) -> bool:
         except Exception:
             pass
     return False
+
+def set_batch_count(page, batch_count: int = 1) -> bool:
+    """
+    Устанавливает количество генерируемых вариантов (x1, x2, x3, x4) в Google Flow.
+    """
+    if batch_count not in (1, 2, 3, 4):
+        batch_count = 1
+
+    target = f"x{batch_count}"
+    print(f"[*] Установка мультипликатора генерации: {target}")
+    try:
+        trig = page.locator("button[aria-label*='Триггер' i], button:has-text('Nano Banana')").first
+        if trig.is_visible(timeout=1000):
+            trig.click()
+            page.wait_for_timeout(400)
+            btn = page.locator(f".cdk-overlay-pane button:has-text('{target}'), [role='menuitem']:has-text('{target}')").first
+            if btn.is_visible(timeout=1200):
+                btn.click()
+                page.wait_for_timeout(300)
+                page.keyboard.press("Escape")
+                print(f"[+] Мультипликатор {target} успешно активирован.")
+                return True
+            page.keyboard.press("Escape")
+    except Exception as e:
+        print(f"[-] Предупреждение: Не удалось установить мультипликатор {target}: {e}")
+        try:
+            page.keyboard.press("Escape")
+        except Exception:
+            pass
+    return False
+
+def set_video_audio_mode(page, mute_audio: bool = False) -> bool:
+    """
+    Управляет звуком видео Veo через меню настроек студии ('Вернуть видео без звука').
+    """
+    print(f"[*] Настройка аудиорежима видео: mute_audio={mute_audio}")
+    try:
+        tune_btn = page.locator("button[aria-label='Настройки']").first
+        if not tune_btn.is_visible(timeout=1000):
+            return False
+        tune_btn.click()
+        page.wait_for_timeout(500)
+        mute_item = page.locator("button:has-text('Вернуть видео без звука'), [role='menuitem']:has-text('Вернуть видео без звука'), [role='switch']:has-text('без звука')").first
+        if mute_item.is_visible(timeout=1500):
+            is_checked = (
+                mute_item.get_attribute("aria-checked") == "true" or
+                "checked" in (mute_item.get_attribute("class") or "").lower()
+            )
+            if is_checked != mute_audio:
+                mute_item.click()
+                page.wait_for_timeout(300)
+                print(f"[+] Переключатель звука Veo обновлен: mute_audio={mute_audio}")
+        page.keyboard.press("Escape")
+        return True
+    except Exception as e:
+        print(f"[-] Предупреждение: Не удалось настроить аудиорежим видео ({e})")
+        try:
+            page.keyboard.press("Escape")
+        except Exception:
+            pass
+        return False
 
 def attach_reference_image(page, image_path: str) -> bool:
     """
@@ -400,6 +499,8 @@ def generate_flow_media(
     reference_image: str = None,
     aspect_ratio: str = None,
     camera_motion: str = None,
+    batch_count: int = 1,
+    mute_audio: bool = False,
     expand_prompt_flag: bool = False,
     upscale_2k: bool = False,
     edit_tile_index: int = None,
@@ -423,26 +524,7 @@ def generate_flow_media(
     print(f"[*] Prompt: {effective_prompt}")
 
     with sync_playwright() as p:
-        if is_cdp_available():
-            browser = p.chromium.connect_over_cdp(CDP_URL)
-            context = browser.contexts[0]
-            is_headless = False
-        else:
-            if not STORAGE_FILE.exists():
-                raise RuntimeError(
-                    f"Файл сессии {STORAGE_FILE} не найден. "
-                    "Требуется однократная авторизация через auth.py для сохранения сессионных cookie."
-                )
-            browser = p.chromium.launch(
-                channel="chrome",
-                headless=True,
-                args=["--disable-blink-features=AutomationControlled", "--no-sandbox"]
-            )
-            context = browser.new_context(
-                storage_state=str(STORAGE_FILE),
-                user_agent=USER_AGENT
-            )
-            is_headless = True
+        context, browser, is_headless = get_flow_context(p)
 
         try:
             page = get_or_create_page(context)
@@ -456,6 +538,12 @@ def generate_flow_media(
 
             if aspect_ratio:
                 set_aspect_ratio(page, aspect_ratio=aspect_ratio)
+
+            if media_type == "image" and batch_count > 1:
+                set_batch_count(page, batch_count=batch_count)
+
+            if media_type == "video":
+                set_video_audio_mode(page, mute_audio=mute_audio)
 
             if edit_tile_index is not None:
                 select_tile_for_editing(page, tile_index=edit_tile_index)
@@ -524,8 +612,9 @@ def generate_flow_media(
                 ]
                 if full_res_diff:
                     new_assets = full_res_diff
-                    print(f"\n[+] Обнаружен полноразмерный ассет ({len(new_assets)} шт.)!")
-                    break
+                    if len(new_assets) >= batch_count or elapsed >= (timeout_sec * 800):
+                        print(f"\n[+] Обнаружен полноразмерный ассет ({len(new_assets)} шт.)!")
+                        break
 
                 # Запасной вариант: /asb/ ассеты
                 asb_diff = [
@@ -534,8 +623,9 @@ def generate_flow_media(
                 ]
                 if asb_diff:
                     new_assets = asb_diff
-                    print(f"\n[+] Обнаружен новый ассет Flow ({len(new_assets)} шт.)!")
-                    break
+                    if len(new_assets) >= batch_count or elapsed >= (timeout_sec * 800):
+                        print(f"\n[+] Обнаружен новый ассет Flow ({len(new_assets)} шт.)!")
+                        break
 
                 sys.stdout.write(".")
                 sys.stdout.flush()
@@ -574,12 +664,16 @@ def generate_flow_media(
                 "reference_image": reference_image,
                 "aspect_ratio": aspect_ratio,
                 "camera_motion": camera_motion,
+                "batch_count": batch_count,
+                "mute_audio": mute_audio,
                 "upscale_2k": upscale_2k,
                 "files": saved_files,
                 "count": len(saved_files)
             }
         finally:
-            if is_headless:
+            if context and not is_cdp_available():
+                context.close()
+            if browser:
                 browser.close()
 
 def generate_frames_to_video(
@@ -597,23 +691,7 @@ def generate_frames_to_video(
     out_path.mkdir(parents=True, exist_ok=True)
 
     with sync_playwright() as p:
-        if is_cdp_available():
-            browser = p.chromium.connect_over_cdp(CDP_URL)
-            context = browser.contexts[0]
-            is_headless = False
-        else:
-            if not STORAGE_FILE.exists():
-                raise RuntimeError(f"Файл сессии {STORAGE_FILE} не найден.")
-            browser = p.chromium.launch(
-                channel="chrome",
-                headless=True,
-                args=["--disable-blink-features=AutomationControlled", "--no-sandbox"]
-            )
-            context = browser.new_context(
-                storage_state=str(STORAGE_FILE),
-                user_agent=USER_AGENT
-            )
-            is_headless = True
+        context, browser, is_headless = get_flow_context(p)
 
         try:
             page = get_or_create_page(context)
@@ -680,7 +758,9 @@ def generate_frames_to_video(
                 "count": len(saved_files)
             }
         finally:
-            if is_headless:
+            if context and not is_cdp_available():
+                context.close()
+            if browser:
                 browser.close()
 
 def extend_flow_video(
@@ -696,23 +776,7 @@ def extend_flow_video(
     out_path.mkdir(parents=True, exist_ok=True)
 
     with sync_playwright() as p:
-        if is_cdp_available():
-            browser = p.chromium.connect_over_cdp(CDP_URL)
-            context = browser.contexts[0]
-            is_headless = False
-        else:
-            if not STORAGE_FILE.exists():
-                raise RuntimeError(f"Файл сессии {STORAGE_FILE} не найден.")
-            browser = p.chromium.launch(
-                channel="chrome",
-                headless=True,
-                args=["--disable-blink-features=AutomationControlled", "--no-sandbox"]
-            )
-            context = browser.new_context(
-                storage_state=str(STORAGE_FILE),
-                user_agent=USER_AGENT
-            )
-            is_headless = True
+        context, browser, is_headless = get_flow_context(p)
 
         try:
             page = get_or_create_page(context)
@@ -801,7 +865,9 @@ def extend_flow_video(
                 "count": len(saved_files)
             }
         finally:
-            if is_headless:
+            if context and not is_cdp_available():
+                context.close()
+            if browser:
                 browser.close()
 
 def upscale_flow_image(
@@ -817,23 +883,7 @@ def upscale_flow_image(
     out_path.mkdir(parents=True, exist_ok=True)
 
     with sync_playwright() as p:
-        if is_cdp_available():
-            browser = p.chromium.connect_over_cdp(CDP_URL)
-            context = browser.contexts[0]
-            is_headless = False
-        else:
-            if not STORAGE_FILE.exists():
-                raise RuntimeError(f"Файл сессии {STORAGE_FILE} не найден.")
-            browser = p.chromium.launch(
-                channel="chrome",
-                headless=True,
-                args=["--disable-blink-features=AutomationControlled", "--no-sandbox"]
-            )
-            context = browser.new_context(
-                storage_state=str(STORAGE_FILE),
-                user_agent=USER_AGENT
-            )
-            is_headless = True
+        context, browser, is_headless = get_flow_context(p)
 
         try:
             page = get_or_create_page(context)
@@ -882,7 +932,9 @@ def upscale_flow_image(
                 "count": 1
             }
         finally:
-            if is_headless:
+            if context and not is_cdp_available():
+                context.close()
+            if browser:
                 browser.close()
 
 def edit_flow_image(
@@ -987,3 +1039,157 @@ def finalize_asset(
         "media_type": "video" if is_video else "image",
         "message": f"Ассет успешно финализирован в {resolved_target}"
     }
+
+def regenerate_flow_tile(
+    tile_index: int = -1,
+    output_dir: Optional[str] = None,
+    timeout_sec: int = 90
+) -> Dict[str, Any]:
+    """
+    Перезапускает генерацию существующей плитки на холсте Google Flow ('Сгенерировать повторно').
+    """
+    out_path = Path(output_dir).resolve() if output_dir else Path.cwd() / "outputs"
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    with sync_playwright() as p:
+        context, browser, is_headless = get_flow_context(p)
+        try:
+            page = get_or_create_page(context)
+            if not ensure_in_project(page):
+                raise RuntimeError("Не удалось открыть проектную область Google Flow.")
+
+            before_urls = page.evaluate('''() => {
+                return Array.from(document.querySelectorAll('img')).map(i => i.src);
+            }''')
+
+            regen_buttons = page.locator("button[aria-label='Сгенерировать повторно']").all()
+            if not regen_buttons:
+                raise RuntimeError("Кнопки 'Сгенерировать повторно' не найдены на холсте.")
+
+            idx = len(regen_buttons) - 1 if tile_index < 0 else min(tile_index, len(regen_buttons) - 1)
+            target_btn = regen_buttons[idx]
+            target_btn.click()
+            print(f"[*] Запущен повтор генерации плитки {idx}...")
+
+            elapsed = 0
+            poll_interval = 2000
+            new_assets = []
+            while elapsed < (timeout_sec * 1000):
+                page.wait_for_timeout(poll_interval)
+                elapsed += poll_interval
+                after_imgs = page.evaluate('''() => {
+                    return Array.from(document.querySelectorAll('img')).map(i => i.src);
+                }''')
+                diff = [src for src in after_imgs if src not in before_urls and ('flow-content.google' in src or '/asb/' in src)]
+                if diff:
+                    new_assets = diff
+                    break
+                sys.stdout.write(".")
+                sys.stdout.flush()
+
+            if not new_assets:
+                raise TimeoutError(f"Повторная генерация не завершилась за {timeout_sec} сек.")
+
+            saved_files = []
+            timestamp = int(time.time())
+            for i, asset_url in enumerate(new_assets, 1):
+                dest = out_path / f"flow_regen_{timestamp}_{i}.png"
+                if download_asset_via_browser(page, asset_url, dest):
+                    saved_files.append(str(dest))
+
+            return {
+                "success": len(saved_files) > 0,
+                "files": saved_files,
+                "tile_index": idx,
+                "markdown_embed": f"![regen]({Path(saved_files[0]).as_uri()})" if saved_files else ""
+            }
+        finally:
+            if context and not is_cdp_available():
+                context.close()
+            if browser:
+                browser.close()
+
+def list_flow_projects() -> List[Dict[str, Any]]:
+    """
+    Получает список существующих проектов пользователя в Google Flow.
+    """
+    with sync_playwright() as p:
+        context, browser, is_headless = get_flow_context(p)
+        try:
+            page = context.pages[0] if context.pages else context.new_page()
+            page.goto(FLOW_URL, wait_until="domcontentloaded", timeout=25000)
+            page.wait_for_timeout(3000)
+
+            projects = page.evaluate('''() => {
+                const links = Array.from(document.querySelectorAll('a[href*="/project/"]'));
+                const seen = new Set();
+                const result = [];
+                for (const a of links) {
+                    const href = a.getAttribute('href') || '';
+                    const match = href.match(/\\/project\\/([a-zA-Z0-9_-]+)/);
+                    if (match && !seen.has(match[1])) {
+                        seen.add(match[1]);
+                        const card = a.closest('.project-card, mat-card, div') || a;
+                        const titleEl = card.querySelector('h2, h3, .project-title, .title') || a;
+                        const title = (titleEl.innerText || a.getAttribute('aria-label') || 'Без названия').trim();
+                        result.push({
+                            id: match[1],
+                            title: title,
+                            url: 'https://flow.google.com' + href
+                        });
+                    }
+                }
+                return result;
+            }''')
+            return projects
+        finally:
+            if context and not is_cdp_available():
+                context.close()
+            if browser:
+                browser.close()
+
+def create_flow_project(name: str = "") -> Dict[str, Any]:
+    """
+    Создает новый изолированный проект в Google Flow и возвращает его ID и URL.
+    """
+    with sync_playwright() as p:
+        context, browser, is_headless = get_flow_context(p)
+        try:
+            page = context.pages[0] if context.pages else context.new_page()
+            page.goto(FLOW_URL, wait_until="domcontentloaded", timeout=25000)
+            page.wait_for_timeout(2500)
+
+            new_btn = page.locator("button:has-text('Новый проект'), [aria-label*='Новый проект' i], button.new-project-btn").first
+            if not new_btn.is_visible(timeout=3000):
+                raise RuntimeError("Кнопка 'Новый проект' не найдена на главной странице Flow.")
+
+            new_btn.click()
+            page.wait_for_url("**/project/**", timeout=12000)
+            page.wait_for_timeout(2000)
+
+            url = page.url
+            proj_id = url.split("/project/")[-1].split("?")[0].split("/")[0]
+
+            if name:
+                try:
+                    title_input = page.locator("input.project-name-input, [aria-label*='Название проекта' i]").first
+                    if title_input.is_visible(timeout=1500):
+                        title_input.click()
+                        page.keyboard.press("Control+A")
+                        title_input.fill(name)
+                        page.keyboard.press("Enter")
+                        page.wait_for_timeout(500)
+                except Exception:
+                    pass
+
+            return {
+                "success": True,
+                "project_id": proj_id,
+                "url": url,
+                "name": name if name else "Новый проект"
+            }
+        finally:
+            if context and not is_cdp_available():
+                context.close()
+            if browser:
+                browser.close()

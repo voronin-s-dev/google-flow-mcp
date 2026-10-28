@@ -1,0 +1,15 @@
+{
+  "name": "flow_list_projects",
+  "description": "\nПолучить реестр всех проектов пользователя в Google Flow с их ID и постоянными ссылками.\n",
+  "parameters": {
+    "properties": {},
+    "title": "flow_list_projectsArguments",
+    "type": "object"
+  },
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": true
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "flow_create_project",
+  "description": "\nСоздать новый изолированный проект в Google Flow под конкретную задачу.\n\n:param name: Название нового проекта (опционально).\n",
+  "parameters": {
+    "properties": {
+      "name": {
+        "default": "",
+        "title": "Name",
+        "type": "string"
+      }
+    },
+    "title": "flow_create_projectArguments",
+    "type": "object"
+  },
+  "annotations": {
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": true
+  }
+}

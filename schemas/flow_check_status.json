@@ -1,6 +1,6 @@
 {
   "name": "flow_check_status",
-  "description": "\nПроверить доступность Google Flow и статус авторизации (CDP / Headless).\n",
+  "description": "\nПроверить доступность Google Flow и статус авторизации (CDP / Headless / Native Profile).\n",
   "parameters": {
     "properties": {},
     "title": "flow_check_statusArguments",

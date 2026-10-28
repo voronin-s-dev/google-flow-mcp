@@ -1,6 +1,6 @@
 {
   "name": "flow_generate_image",
-  "description": "\nСгенерировать высококачественное изображение через Google Flow в фоне.\n\n:param prompt: Детальный промпт на английском языке (стиль, освещение, композиция, детали).\n:param reference_image: Локальный путь к изображению-референсу для генерации (Image-to-Image / Style).\n:param aspect_ratio: Желаемое соотношение сторон: '16:9', '9:16', '1:1', '4:3'.\n:param model_name: Модель: 'nano_banana_2.1', 'nano_banana_pro', 'nano_banana_2_lite'.\n:param expand_prompt: Если True, автоматически расширяет промпт стилистическими и световыми модификаторами.\n:param upscale_2k: Если True, сразу запрашивает и сохраняет 2K версию изображения.\n:param output_dir: Папка для сохранения сгенерированных файлов (по умолчанию: ./outputs).\n:param timeout_seconds: Максимальное время ожидания генерации (по умолчанию 90 секунд).\n",
+  "description": "\nСгенерировать высококачественное изображение через Google Flow в фоне.\n\n:param prompt: Детальный промпт на английском языке (стиль, освещение, композиция, детали).\n:param reference_image: Локальный путь к изображению-референсу для генерации (Image-to-Image / Style).\n:param aspect_ratio: Желаемое соотношение сторон: '16:9', '9:16', '1:1', '4:3', '3:4'.\n:param batch_count: Количество генерируемых вариантов за один вызов: 1, 2, 3 или 4 (по умолчанию 1).\n:param model_name: Модель: 'nano_banana_2.1', 'nano_banana_pro', 'nano_banana_2_lite'.\n:param expand_prompt: Если True, автоматически расширяет промпт стилистическими и световыми модификаторами.\n:param upscale_2k: Если True, сразу запрашивает и сохраняет 2K версию изображения.\n:param output_dir: Папка для сохранения сгенерированных файлов (по умолчанию: ./outputs).\n:param timeout_seconds: Максимальное время ожидания генерации (по умолчанию 90 секунд).\n",
   "parameters": {
     "properties": {
       "prompt": {
@@ -16,6 +16,11 @@
         "default": "",
         "title": "Aspect Ratio",
         "type": "string"
+      },
+      "batch_count": {
+        "default": 1,
+        "title": "Batch Count",
+        "type": "integer"
       },
       "model_name": {
         "default": "nano_banana_2.1",
