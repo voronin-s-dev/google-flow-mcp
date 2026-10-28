@@ -19,6 +19,40 @@ from engine import (
     PROFILE_DIR
 )
 
+def _attach_ui_card(
+    result: dict,
+    prompt: str,
+    aspect_ratio: str = "1:1",
+    media_type: str = "image",
+    batch_count: int = 1,
+    status_label: str = "Черновик готов",
+    tile_index: int = -1,
+    is_autonomous: bool = False,
+) -> None:
+    """Attach Generative UI card path and <agent-embed> tag to the result dictionary."""
+    if not isinstance(result, dict):
+        return
+    files = result.get("files") or ([result.get("file")] if result.get("file") else [])
+    if files:
+        try:
+            from widget import save_flow_card
+            first_dir = Path(files[0]).parent if files[0] else None
+            card_path = save_flow_card(
+                media_paths=files,
+                prompt=prompt,
+                output_dir=str(first_dir) if first_dir else None,
+                aspect_ratio=aspect_ratio or "1:1",
+                media_type=media_type,
+                batch_count=batch_count,
+                status_label=status_label,
+                tile_index=tile_index,
+                is_autonomous=is_autonomous,
+            )
+            result["card_html"] = card_path
+            result["embed_tag"] = f'<agent-embed src="file:///{Path(card_path).resolve().as_posix()}"></agent-embed>'
+        except Exception:
+            pass
+
 app = MCPServer("google-flow")
 
 @app.tool(
@@ -102,6 +136,16 @@ def flow_generate_image(
             model_name=model_name,
             timeout_sec=timeout_seconds
         )
+        if isinstance(result, dict) and result.get("files"):
+            _attach_ui_card(
+                result=result,
+                prompt=prompt,
+                aspect_ratio=aspect_ratio or "1:1",
+                media_type="image",
+                batch_count=batch_count,
+                status_label="Черновик готов",
+                tile_index=-1,
+            )
         return json.dumps(result, ensure_ascii=False, indent=2)
     except Exception as e:
         return json.dumps({
@@ -152,6 +196,16 @@ def flow_generate_video(
             expand_prompt_flag=expand_prompt,
             timeout_sec=timeout_seconds
         )
+        if isinstance(result, dict) and result.get("files"):
+            _attach_ui_card(
+                result=result,
+                prompt=prompt,
+                aspect_ratio=aspect_ratio or "16:9",
+                media_type="video",
+                batch_count=1,
+                status_label="Видео Veo готово",
+                tile_index=-1,
+            )
         return json.dumps(result, ensure_ascii=False, indent=2)
     except Exception as e:
         return json.dumps({
@@ -316,6 +370,16 @@ def flow_edit_image(
             model_name=model_name,
             timeout_sec=timeout_seconds
         )
+        if isinstance(result, dict) and result.get("files"):
+            _attach_ui_card(
+                result=result,
+                prompt=prompt,
+                aspect_ratio=aspect_ratio or "1:1",
+                media_type="image",
+                batch_count=1,
+                status_label="Вариация готова",
+                tile_index=tile_index,
+            )
         return json.dumps(result, ensure_ascii=False, indent=2)
     except Exception as e:
         return json.dumps({
@@ -357,6 +421,16 @@ def flow_finalize_asset(
             upscale_2k=upscale_2k,
             timeout_sec=timeout_seconds
         )
+        if isinstance(result, dict) and result.get("success"):
+            _attach_ui_card(
+                result=result,
+                prompt="Финализированный ассет 2K",
+                aspect_ratio="1:1",
+                media_type="image",
+                batch_count=1,
+                status_label="2K Продакшн",
+                tile_index=tile_index,
+            )
         return json.dumps(result, ensure_ascii=False, indent=2)
     except Exception as e:
         return json.dumps({
