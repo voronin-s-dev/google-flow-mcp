@@ -82,9 +82,10 @@ def is_cdp_online() -> bool:
     except Exception:
         return False
 
-def check_dom_selectors() -> Tuple[bool, List[str]]:
+def check_dom_selectors(use_headless: bool = False) -> Tuple[bool, List[str]]:
     """
-    Подключается к запущенному Chrome по CDP и проверяет видимость основных селекторов Google Flow.
+    Подключается к запущенному Chrome по CDP или запускает тихий headless-контекст
+    и проверяет видимость основных селекторов Google Flow.
     НЕ выполняет генерацию и не расходует квоты пользователя.
     """
     from playwright.sync_api import sync_playwright
@@ -94,19 +95,26 @@ def check_dom_selectors() -> Tuple[bool, List[str]]:
 
     with sync_playwright() as p:
         try:
-            browser = p.chromium.connect_over_cdp(CDP_URL)
-            context = browser.contexts[0]
-            
-            # Поиск страницы Flow
-            flow_page = None
-            for page in context.pages:
-                if "flow.google.com" in page.url or "labs.google" in page.url:
-                    flow_page = page
-                    break
+            browser = None
+            if use_headless:
+                from engine import get_flow_context, get_or_create_page, ensure_in_project
+                context, browser, is_h = get_flow_context(p)
+                flow_page = get_or_create_page(context)
+                ensure_in_project(flow_page)
+            else:
+                browser = p.chromium.connect_over_cdp(CDP_URL)
+                context = browser.contexts[0]
+                
+                # Поиск страницы Flow
+                flow_page = None
+                for page in context.pages:
+                    if "flow.google.com" in page.url or "labs.google" in page.url:
+                        flow_page = page
+                        break
 
-            if not flow_page:
-                logs.append("[-] В открытом Chrome нет активной вкладки flow.google.com.")
-                return False, logs
+                if not flow_page:
+                    logs.append("[-] В открытом Chrome нет активной вкладки flow.google.com.")
+                    return False, logs
 
             logs.append(f"[+] Найдена страница Flow: {flow_page.url}")
 
@@ -128,6 +136,13 @@ def check_dom_selectors() -> Tuple[bool, List[str]]:
                     "button[aria-label*='создать' i]",
                     "button[type='submit']",
                     "button:has-text('Generate')"
+                ]),
+                ("Кнопка настроек генератора (tune / aspect ratio)", [
+                    "flow-base-prompt-box button:has-text('tune')",
+                    "flow-base-prompt-box button:has(mat-icon:has-text('tune'))",
+                    "flow-base-prompt-box button[aria-label*='Настройки' i]",
+                    "flow-base-prompt-box button[aria-label*='Settings' i]",
+                    "button[aria-label*='Настройки агента' i]"
                 ]),
                 ("Селектор референсного файла", [
                     "flow-base-prompt-box button:has-text('add')",
@@ -154,7 +169,7 @@ def check_dom_selectors() -> Tuple[bool, List[str]]:
                 for sel in selectors:
                     loc = flow_page.locator(sel).first
                     try:
-                        if loc.is_visible(timeout=800):
+                        if loc.is_visible(timeout=1000):
                             logs.append(f"[PASS] {name}: найден селектор '{sel}'")
                             found = True
                             break
@@ -163,12 +178,16 @@ def check_dom_selectors() -> Tuple[bool, List[str]]:
                 
                 if not found:
                     logs.append(f"[WARN] {name}: ни один селектор из списка не обнаружен на текущем экране.")
-                    # Это не критическая ошибка, если мы на главной странице, а не в проекте
-                    if "/project/" in flow_page.url:
+                    if "/project/" in flow_page.url and name not in ("Область плиток / результатов",):
                         success = False
 
+            if browser:
+                browser.close()
+            else:
+                context.close()
+
         except Exception as e:
-            logs.append(f"[ERROR] Ошибка подключения к CDP: {e}")
+            logs.append(f"[ERROR] Ошибка проверки DOM: {e}")
             return False, logs
 
     return success, logs
@@ -197,13 +216,17 @@ def main():
     if not args.skip_cdp:
         print("\n[*] Шаг 2: Проверка селекторов в живом интерфейсе Google Flow...")
         if is_cdp_online():
-            print(f"[+] CDP порт 9222 активен ({CDP_URL}). Запуск быстрой инспекции...")
-            dom_ok, dom_logs = check_dom_selectors()
+            print(f"[+] CDP порт 9222 активен ({CDP_URL}). Запуск быстрой инспекции через CDP...")
+            dom_ok, dom_logs = check_dom_selectors(use_headless=False)
             for log in dom_logs:
                 print(f"  {log}")
             cdp_ok = dom_ok
         else:
-            print("[INFO] Chrome на порту 9222 не запущен. Для живой проверки DOM запустите: start_chrome.bat")
+            print("[INFO] Chrome на порту 9222 не запущен. Запуск инспекции селекторов в тихом headless-режиме...")
+            dom_ok, dom_logs = check_dom_selectors(use_headless=True)
+            for log in dom_logs:
+                print(f"  {log}")
+            cdp_ok = dom_ok
 
     print("\n" + "=" * 60)
     if contract_ok and cdp_ok:

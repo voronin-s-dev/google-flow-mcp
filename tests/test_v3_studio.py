@@ -94,3 +94,26 @@ async def test_all_v3_tools_registered():
     ]
     for expected in v3_tools:
         assert expected in tool_names, f"Tool {expected} must be registered in MCPServer"
+
+def test_upscale_2k_preserves_aspect_ratio():
+    from engine import upscale_image_fast_2k, HAS_PIL
+    if not HAS_PIL:
+        pytest.skip("PIL is not installed")
+    from PIL import Image
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        # Создаем тестовое изображение 3:4 (300x400)
+        src = tmp_path / "test_3_4.png"
+        dest = tmp_path / "test_2k.png"
+        img = Image.new("RGB", (300, 400), color=(255, 0, 0))
+        img.save(src)
+
+        ok = upscale_image_fast_2k(src, dest)
+        assert ok is True
+        assert dest.exists()
+
+        with Image.open(dest) as up:
+            assert max(up.width, up.height) >= 2048
+            # Проверяем сохранение соотношения 3:4 (0.75)
+            assert round(up.width / up.height, 2) == 0.75

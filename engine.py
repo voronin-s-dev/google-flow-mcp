@@ -1,6 +1,7 @@
 import os
 import sys
 import io
+import re
 import time
 import base64
 import shutil
@@ -9,6 +10,17 @@ import urllib.request
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from playwright.sync_api import sync_playwright
+
+if hasattr(sys.stdout, "buffer") and sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+if hasattr(sys.stderr, "buffer") and sys.stderr.encoding and sys.stderr.encoding.lower() != 'utf-8':
+    try:
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    except Exception:
+        pass
 
 try:
     from PIL import Image, ImageFilter
@@ -86,12 +98,24 @@ def ensure_in_project(page) -> bool:
     if "/project/" in page.url:
         return True
 
-    # Поиск кнопки "Новый проект"
+    # 1. Поиск существующих карточек проектов
+    cards = page.locator("a[href*='/project/']").all()
+    if cards:
+        cards[0].click()
+        try:
+            page.wait_for_url("**/project/**", timeout=15000)
+            page.locator("flow-base-prompt-box").first.wait_for(state="visible", timeout=15000)
+            return True
+        except Exception:
+            pass
+
+    # 2. Поиск кнопки "Новый проект"
     new_proj_btn = page.get_by_role("button", name="Новый проект").or_(page.get_by_text("Новый проект")).first
     if new_proj_btn.is_visible(timeout=3000):
         new_proj_btn.click()
         try:
-            page.wait_for_url("**/project/**", timeout=8000)
+            page.wait_for_url("**/project/**", timeout=15000)
+            page.locator("flow-base-prompt-box").first.wait_for(state="visible", timeout=15000)
             return True
         except Exception:
             pass
@@ -100,7 +124,8 @@ def ensure_in_project(page) -> bool:
     if create_btn.is_visible(timeout=2000):
         create_btn.click()
         try:
-            page.wait_for_url("**/project/**", timeout=8000)
+            page.wait_for_url("**/project/**", timeout=15000)
+            page.locator("flow-base-prompt-box").first.wait_for(state="visible", timeout=15000)
             return True
         except Exception:
             pass
@@ -121,150 +146,192 @@ def ensure_media_mode(page, media_type: str = "image") -> bool:
         page.get_by_role("button", name=ru_label),
         page.locator(f"button[aria-label*='{label}' i]"),
         page.locator(f"button[aria-label*='{ru_label}' i]"),
-        page.locator(f"[data-testid*='mode-{target}']")
+        page.locator(f"[data-testid*='mode-{target}']"),
+        page.locator("button:has(mat-icon:has-text('movie'))") if target == "video" else page.locator("button:has(mat-icon:has-text('dashboard'))")
     ]
     for btn_loc in mode_selectors:
         btn = btn_loc.first
-        if btn.is_visible(timeout=600):
-            is_active = (
-                btn.get_attribute("aria-pressed") == "true" or
-                btn.get_attribute("aria-selected") == "true" or
-                "active" in (btn.get_attribute("class") or "").lower() or
-                "selected" in (btn.get_attribute("class") or "").lower()
-            )
-            if not is_active:
-                btn.click()
-                page.wait_for_timeout(800)
-            return True
-
-    # Способ 2: Через всплывающее меню настроек
-    trig = page.locator("button[aria-label*='Триггер' i], button:has-text('Nano Banana')").first
-    if trig.is_visible(timeout=1000):
-        trig.click()
-        page.wait_for_timeout(600)
-        mode_btn = page.locator(f"button:has-text('{ru_label}'), button:has-text('{label}')").first
-        if mode_btn.is_visible(timeout=1500):
-            mode_btn.click()
-            page.wait_for_timeout(500)
-        page.keyboard.press("Escape")
-        return True
+        try:
+            if btn.is_visible(timeout=600):
+                is_active = (
+                    btn.get_attribute("aria-pressed") == "true" or
+                    btn.get_attribute("aria-selected") == "true" or
+                    "active" in (btn.get_attribute("class") or "").lower() or
+                    "selected" in (btn.get_attribute("class") or "").lower()
+                )
+                if not is_active:
+                    btn.click()
+                    page.wait_for_timeout(600)
+                return True
+        except Exception:
+            pass
 
     return False
 
-def set_model_family(page, model_name: Optional[str] = None) -> bool:
+def configure_generation_settings(
+    page,
+    media_type: str = "image",
+    aspect_ratio: Optional[str] = None,
+    batch_count: int = 1,
+    model_name: Optional[str] = None
+) -> bool:
     """
-    Устанавливает модель в Google Flow (Nano Banana 2.1, Nano Banana Pro, Nano Banana 2 Lite).
+    Унифицированная и отказоустойчивая настройка параметров генерации в Google Flow (RU/EN).
+    Открывает сайдбар настроек агента, выставляет соотношение сторон, мультипликатор батча,
+    модель, нажимает 'Сохранить' и закрывает сайдбар.
     """
-    if not model_name:
-        return False
+    is_video = media_type.lower().strip() == "video"
+    print(f"[*] Настройка параметров Google Flow: media_type='{media_type}', ratio={aspect_ratio}, batch={batch_count}, model={model_name}")
 
-    name_lower = model_name.lower().strip()
-    target_text = "Nano Banana 2.1"
-    if "pro" in name_lower:
-        target_text = "Nano Banana Pro"
-    elif "lite" in name_lower:
-        target_text = "Nano Banana 2 Lite"
-    elif "2.1" in name_lower or "banana" in name_lower:
-        target_text = "Nano Banana 2.1"
+    if not aspect_ratio and batch_count <= 1 and not model_name:
+        return True
 
-    print(f"[*] Выбор семейства модели: {target_text}")
     try:
-        trig = page.locator("button[aria-label*='Триггер' i], button:has-text('Nano Banana')").first
-        if not trig.is_visible(timeout=1500):
+        # 1. Проверяем, открыт ли уже сайдбар настроек (.settings-section)
+        if not page.locator(".settings-section").first.is_visible(timeout=400):
+            tune_selectors = [
+                "flow-base-prompt-box button:has-text('tune')",
+                "flow-base-prompt-box button:has(mat-icon:has-text('tune'))",
+                "flow-base-prompt-box button[aria-label*='Настройки' i]",
+                "flow-base-prompt-box button[aria-label*='Settings' i]",
+                "button:has(mat-icon:has-text('tune'))"
+            ]
+            tune_btn = None
+            for sel in tune_selectors:
+                btn = page.locator(sel).first
+                try:
+                    if btn.is_visible(timeout=800):
+                        tune_btn = btn
+                        break
+                except Exception:
+                    pass
+
+            if not tune_btn:
+                print("[-] Предупреждение: Кнопка 'Настройки' (tune) в prompt-box не найдена.")
+                return False
+
+            tune_btn.click()
+            page.wait_for_timeout(800)
+
+        # Ожидаем появления секций настроек
+        page.locator(".settings-section").first.wait_for(state="visible", timeout=6000)
+
+        # 2. Определяем нужную секцию настроек (изображения или видео)
+        section = None
+        if is_video:
+            sec_candidates = page.locator(".settings-section").filter(has_text=re.compile(r"видео|video", re.I)).all()
+            if sec_candidates:
+                section = sec_candidates[0]
+            else:
+                secs = page.locator(".settings-section").all()
+                if len(secs) >= 3:
+                    section = secs[2]
+        else:
+            sec_candidates = page.locator(".settings-section").filter(has_text=re.compile(r"изображен|image", re.I)).all()
+            if sec_candidates:
+                section = sec_candidates[0]
+            else:
+                sec_with_ratios = page.locator(".settings-section").filter(has_text="4:3").all()
+                if sec_with_ratios:
+                    section = sec_with_ratios[0]
+                else:
+                    secs = page.locator(".settings-section").all()
+                    if len(secs) >= 2:
+                        section = secs[1]
+
+        if not section:
+            print(f"[-] Предупреждение: Секция настроек для '{media_type}' не найдена в сайдбаре.")
             return False
 
-        trig.click()
-        page.wait_for_timeout(600)
+        # 3. Выбор соотношения сторон
+        if aspect_ratio:
+            ratio = validate_aspect_ratio(aspect_ratio)
+            if ratio:
+                ratio_toggle = section.locator(f"mat-button-toggle:has-text('{ratio}'), button:has-text('{ratio}')").first
+                if ratio_toggle.is_visible(timeout=1500):
+                    cls = ratio_toggle.get_attribute("class") or ""
+                    if "checked" not in cls:
+                        ratio_toggle.click()
+                        page.wait_for_timeout(300)
+                        cls_after = ratio_toggle.get_attribute("class") or ""
+                        print(f"[+] Соотношение сторон '{ratio}' успешно выбрано (checked: {'checked' in cls_after})")
+                    else:
+                        print(f"[+] Соотношение сторон '{ratio}' уже активно.")
+                else:
+                    print(f"[-] Ошибка: Кнопка соотношения сторон '{ratio}' не найдена в секции {media_type}.")
+                    raise RuntimeError(f"Кнопка соотношения сторон '{ratio}' не найдена в интерфейсе Google Flow.")
 
-        family_btn = page.locator("button[aria-label='Выбрать семейство моделей']").first
-        if family_btn.is_visible(timeout=1500):
-            family_btn.click()
-            page.wait_for_timeout(600)
+        # 4. Выбор множителя батча (x1, x2, x3, x4)
+        if batch_count and batch_count in (1, 2, 3, 4):
+            target_batch = f"x{batch_count}"
+            batch_toggle = section.locator(f"mat-button-toggle:has-text('{target_batch}'), button:has-text('{target_batch}')").first
+            if batch_toggle.is_visible(timeout=1000):
+                cls = batch_toggle.get_attribute("class") or ""
+                if "checked" not in cls:
+                    batch_toggle.click()
+                    page.wait_for_timeout(300)
+                    print(f"[+] Множитель батча '{target_batch}' активирован.")
 
-            choice = page.locator(f".cdk-overlay-pane:last-child button:has-text('{target_text}')").first
-            if choice.is_visible(timeout=2000):
-                choice.click()
-                page.wait_for_timeout(500)
-                print(f"[+] Успешно выбрана модель: {target_text}")
+        # 5. Выбор модели (если передан и дропдаун доступен)
+        if model_name:
+            model_btn = section.locator("button:has-text('Banana'), button:has-text('Omni'), [class*='model'], button:has(mat-icon:has-text('arrow_drop_down'))").first
+            if model_btn.is_visible(timeout=1000):
+                cur_text = (model_btn.inner_text() or "").lower()
+                clean_target = model_name.lower().replace("_", " ").replace("-", " ")
+                # Если модель уже соответствует, не открываем меню
+                if clean_target not in cur_text and not ("banana" in cur_text and "banana" in clean_target):
+                    model_btn.click()
+                    page.wait_for_timeout(600)
+                    target_choice = page.locator(f".cdk-overlay-pane button:has-text('{model_name}'), .cdk-overlay-pane [role='menuitem']:has-text('{model_name}')").first
+                    if target_choice.is_visible(timeout=1500):
+                        target_choice.click()
+                        page.wait_for_timeout(300)
+                        print(f"[+] Модель '{model_name}' успешно выбрана.")
+                    else:
+                        page.keyboard.press("Escape")
+                        page.wait_for_timeout(300)
+                else:
+                    print(f"[+] Модель '{model_name}' уже активна: {cur_text.strip()}.")
 
-        page.keyboard.press("Escape")
-        page.wait_for_timeout(300)
+        # 6. Сохранение настроек
+        save_btn = page.locator("button:has-text('Сохранить'), button:has-text('Save')").first
+        if save_btn.is_visible(timeout=1500):
+            save_btn.click(force=True)
+            page.wait_for_timeout(800)
+            print("[+] Настройки Google Flow сохранены в проекте.")
+
+        # 7. Закрываем сайдбар чата, если он открылся
+        close_btn = page.locator("button[aria-label*='Закрыть' i], button[aria-label*='Close' i], button:has(mat-icon:has-text('close'))").first
+        if close_btn.is_visible(timeout=800):
+            close_btn.click(force=True)
+            page.wait_for_timeout(300)
+
         return True
     except Exception as e:
-        print(f"[-] Предупреждение: Не удалось переключить модель ({e})")
+        print(f"[-] Ошибка в configure_generation_settings: {e}")
         try:
             page.keyboard.press("Escape")
         except Exception:
             pass
         return False
 
-def set_aspect_ratio(page, aspect_ratio: Optional[str]) -> bool:
-    """
-    Устанавливает соотношение сторон в интерфейсе Google Flow (16:9, 9:16, 1:1, 4:3, 3:4).
-    """
+def set_model_family(page, model_name: Optional[str] = None, media_type: str = "image") -> bool:
+    """Устанавливает модель в Google Flow."""
+    if not model_name:
+        return False
+    return configure_generation_settings(page, media_type=media_type, model_name=model_name)
+
+def set_aspect_ratio(page, aspect_ratio: Optional[str], media_type: str = "image") -> bool:
+    """Устанавливает соотношение сторон в интерфейсе Google Flow (16:9, 9:16, 1:1, 4:3, 3:4)."""
     if not aspect_ratio:
         return False
-    ratio = validate_aspect_ratio(aspect_ratio)
-    if not ratio:
-        return False
+    return configure_generation_settings(page, media_type=media_type, aspect_ratio=aspect_ratio)
 
-    print(f"[*] Установка соотношения сторон: {ratio}")
-    try:
-        trig = page.locator("button[aria-label*='Триггер' i], button:has-text('Nano Banana')").first
-        if trig.is_visible(timeout=1000):
-            trig.click()
-            page.wait_for_timeout(500)
-            btn_ratio = page.locator(f"button:has-text('{ratio}'), [role='menuitem']:has-text('{ratio}'), [role='option']:has-text('{ratio}')").first
-            if btn_ratio.is_visible(timeout=1500):
-                btn_ratio.click()
-                page.wait_for_timeout(400)
-                page.keyboard.press("Escape")
-                return True
-            page.keyboard.press("Escape")
-
-        # Вариант 2: Прямая кнопка на холсте
-        for sel in [f"button:has-text('{ratio}')", f"button[aria-label*='{ratio}']", f"[data-testid*='{ratio}']"]:
-            btn = page.locator(sel).first
-            if btn.is_visible(timeout=400):
-                btn.click()
-                return True
-    except Exception as e:
-        print(f"[-] Ошибка установки соотношения сторон: {e}")
-        try:
-            page.keyboard.press("Escape")
-        except Exception:
-            pass
-    return False
-
-def set_batch_count(page, batch_count: int = 1) -> bool:
-    """
-    Устанавливает количество генерируемых вариантов (x1, x2, x3, x4) в Google Flow.
-    """
+def set_batch_count(page, batch_count: int = 1, media_type: str = "image") -> bool:
+    """Устанавливает количество генерируемых вариантов (x1, x2, x3, x4) в Google Flow."""
     if batch_count not in (1, 2, 3, 4):
         batch_count = 1
-
-    target = f"x{batch_count}"
-    print(f"[*] Установка мультипликатора генерации: {target}")
-    try:
-        trig = page.locator("button[aria-label*='Триггер' i], button:has-text('Nano Banana')").first
-        if trig.is_visible(timeout=1000):
-            trig.click()
-            page.wait_for_timeout(400)
-            btn = page.locator(f".cdk-overlay-pane button:has-text('{target}'), [role='menuitem']:has-text('{target}')").first
-            if btn.is_visible(timeout=1200):
-                btn.click()
-                page.wait_for_timeout(300)
-                page.keyboard.press("Escape")
-                print(f"[+] Мультипликатор {target} успешно активирован.")
-                return True
-            page.keyboard.press("Escape")
-    except Exception as e:
-        print(f"[-] Предупреждение: Не удалось установить мультипликатор {target}: {e}")
-        try:
-            page.keyboard.press("Escape")
-        except Exception:
-            pass
-    return False
+    return configure_generation_settings(page, media_type=media_type, batch_count=batch_count)
 
 def set_video_audio_mode(page, mute_audio: bool = False) -> bool:
     """
@@ -439,8 +506,11 @@ def upscale_image_fast_2k(source_path: Path, dest_path: Path) -> bool:
     try:
         im = Image.open(source_path).convert('RGB')
         w, h = im.size
-        target_w = max(w * 2, 2048)
-        target_h = max(h * 2, 2048)
+
+        # Масштабируем с сохранением исходного соотношения сторон (длинная сторона не менее 2048)
+        scale = max(2.0, 2048.0 / max(w, h))
+        target_w = int(round(w * scale))
+        target_h = int(round(h * scale))
 
         # 1. Lanczos High-Fidelity Resampling
         up = im.resize((target_w, target_h), Image.Resampling.LANCZOS)
@@ -533,14 +603,14 @@ def generate_flow_media(
 
             ensure_media_mode(page, media_type=media_type)
 
-            if model_name:
-                set_model_family(page, model_name=model_name)
-
-            if aspect_ratio:
-                set_aspect_ratio(page, aspect_ratio=aspect_ratio)
-
-            if media_type == "image" and batch_count > 1:
-                set_batch_count(page, batch_count=batch_count)
+            if model_name or aspect_ratio or (media_type == "image" and batch_count > 1):
+                configure_generation_settings(
+                    page,
+                    media_type=media_type,
+                    aspect_ratio=aspect_ratio,
+                    batch_count=batch_count,
+                    model_name=model_name
+                )
 
             if media_type == "video":
                 set_video_audio_mode(page, mute_audio=mute_audio)
@@ -645,7 +715,16 @@ def generate_flow_media(
                 ok = download_asset_via_browser(page, asset_url, base_dest)
                 if ok and base_dest.exists() and base_dest.stat().st_size > 0:
                     saved_files.append(str(base_dest))
-                    print(f"[SAVED] {base_dest} ({base_dest.stat().st_size} bytes)")
+                    file_res = None
+                    if HAS_PIL and not is_video:
+                        try:
+                            with Image.open(base_dest) as img:
+                                file_res = f"{img.width}x{img.height}"
+                                print(f"[SAVED] {base_dest} ({base_dest.stat().st_size} bytes, resolution: {file_res}, ratio: {img.width/img.height:.2f})")
+                        except Exception:
+                            print(f"[SAVED] {base_dest} ({base_dest.stat().st_size} bytes)")
+                    else:
+                        print(f"[SAVED] {base_dest} ({base_dest.stat().st_size} bytes)")
 
                     # Если запрошен 2K апскейл — создаем 2048x2048 версию мгновенно через Lanczos
                     if upscale_2k and not is_video:
@@ -663,6 +742,7 @@ def generate_flow_media(
                 "original_prompt": prompt,
                 "reference_image": reference_image,
                 "aspect_ratio": aspect_ratio,
+                "resolution": file_res if not is_video else None,
                 "camera_motion": camera_motion,
                 "batch_count": batch_count,
                 "mute_audio": mute_audio,
@@ -700,7 +780,7 @@ def generate_frames_to_video(
 
             ensure_media_mode(page, media_type="video")
             if aspect_ratio:
-                set_aspect_ratio(page, aspect_ratio=aspect_ratio)
+                set_aspect_ratio(page, aspect_ratio=aspect_ratio, media_type="video")
 
             attach_reference_image(page, start_frame)
             attach_end_frame(page, end_frame)
