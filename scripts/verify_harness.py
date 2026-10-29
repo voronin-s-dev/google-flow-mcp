@@ -82,6 +82,13 @@ def is_cdp_online() -> bool:
     except Exception:
         return False
 
+def is_headless_auth_available() -> bool:
+    try:
+        from engine import PROFILE_DIR, STORAGE_FILE
+        return PROFILE_DIR.exists() or STORAGE_FILE.exists()
+    except Exception:
+        return False
+
 def check_dom_selectors(use_headless: bool = False) -> Tuple[bool, List[str]]:
     """
     Подключается к запущенному Chrome по CDP или запускает тихий headless-контекст
@@ -221,12 +228,15 @@ def main():
             for log in dom_logs:
                 print(f"  {log}")
             cdp_ok = dom_ok
-        else:
+        elif is_headless_auth_available() and not os.environ.get("CI"):
             print("[INFO] Chrome на порту 9222 не запущен. Запуск инспекции селекторов в тихом headless-режиме...")
             dom_ok, dom_logs = check_dom_selectors(use_headless=True)
             for log in dom_logs:
                 print(f"  {log}")
             cdp_ok = dom_ok
+        else:
+            print("[INFO] Порт CDP 9222 не активен или запуск в CI-окружении без пользовательской сессии. Пропуск живой проверки DOM.")
+            cdp_ok = True
 
     print("\n" + "=" * 60)
     if contract_ok and cdp_ok:

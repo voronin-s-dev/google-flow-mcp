@@ -34,4 +34,4 @@ jobs:
 
     - name: Run Verification Harness
       run: |
-        python scripts/verify_harness.py
+        python scripts/verify_harness.py --skip-cdp
